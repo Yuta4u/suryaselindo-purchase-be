@@ -546,7 +546,6 @@ exports.approved = async (req, res) => {
 
 exports.sendPo = async (req, res) => {
   const { name, no_po, msg, cc, to, subject, bcc, id } = req.body
-  const arrOfCc = cc.split(',') !== 0 ? cc.split(',') : undefined
 
   const htmlTemplate = `
   <!DOCTYPE html>
@@ -630,7 +629,7 @@ exports.sendPo = async (req, res) => {
     const message = {
       from: `"SIMO TEKNOLOGI INDONESIA" <${process.env.EMAIL}>`,
       to: to.split('|'),
-      cc: arrOfCc,
+      cc: cc.split(',') || undefined,
       bcc: [bcc, process.env.EMAIL] || undefined,
       subject: subject || `Purchase Order ${no_po}`,
       text: `Please find the attached PO document (${no_po}).${
