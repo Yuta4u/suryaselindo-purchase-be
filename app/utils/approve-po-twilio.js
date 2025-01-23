@@ -9,14 +9,14 @@ const client = twilio(id, token)
 
 const approveNotification = async ({ no_po }) => {
   try {
-
     const message = await client.messages.create({
       contentSid: process.env.TWILLIO_APPROVED_MESSAGE,
       messagingServiceSidprocess: process.env.TWILLIO_MESSAGING_SERVICE,
       from: `whatsapp:${fromNumber}`,
       to: process.env.TWILLIO_PURCHASE_NUMBER,
       contentVariables: JSON.stringify({
-        1: no_po,
+        1: 'PT Surya Selindo',
+        2: no_po,
       }),
     })
 

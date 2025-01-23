@@ -132,7 +132,7 @@ exports.create = async (req, res) => {
     await transaction.commit()
 
     // Optional: Send notification
-    await sendWhatsappNotification(supplier.name)
+    await sendWhatsappNotification(supplier.name, prepared_by)
 
     return res.status(201).json({
       message: 'Successfully created Purchase Order',

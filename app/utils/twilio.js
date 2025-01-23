@@ -8,7 +8,7 @@ const toNumber = 'whatsapp:+62817774332'
 
 const client = twilio(id, token)
 
-const sendWhatsappNotification = async (pt) => {
+const sendWhatsappNotification = async (pt, prepared_by) => {
   try {
     if (!toNumber) {
       throw new Error('To number is required')
@@ -19,7 +19,7 @@ const sendWhatsappNotification = async (pt) => {
       messagingServiceSidprocess: process.env.TWILLIO_MESSAGING_SERVICE,
       from: `whatsapp:${fromNumber}`,
       to: toNumber,
-      contentVariables: JSON.stringify({ 1: pt }),
+      contentVariables: JSON.stringify({ 1: 'SS', 2: pt, 3: prepared_by }),
     })
 
     console.log('Message sent successfully:', message.sid)
