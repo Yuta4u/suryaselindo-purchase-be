@@ -1,0 +1,23 @@
+{
+  "development": {
+    "username": "postgres",
+    "password": "p@ssw0rd",
+    "database": "cursed-db-two",
+    "host": "192.168.60.240",
+    "dialect": "postgres"
+  },
+  "test": {
+    "username": "postgres",
+    "password": "p@ssw0rd",
+    "database": "cursed-db-two",
+    "host": "192.168.60.240",
+    "dialect": "postgres"
+  },
+  "production": {
+    "username": "postgres",
+    "password": "p@ssw0rd",
+    "database": "cursed-db-two",
+    "host": "192.168.60.240",
+    "dialect": "postgres"
+  }
+}

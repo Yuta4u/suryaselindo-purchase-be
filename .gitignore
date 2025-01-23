@@ -1,0 +1,33 @@
+# Node modules and dependencies
+/node_modules
+
+# Production build
+/build
+
+# Environment files
+.env            # Semua file .env
+.env.*          # File env dengan ekstensi tambahan seperti .env.production, .env.development
+.env.local      # File env lokal
+.env.*.local    # Variasi lokal, seperti .env.production.local
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Vercel config files
+.vercel
+
+# TypeScript build
+next-env.d.ts
+
+# Certificate files
+*.pem
+
+# MacOS system files
+.DS_Store
+.env
+combined.log
+error.log
+combined.log
+error.log

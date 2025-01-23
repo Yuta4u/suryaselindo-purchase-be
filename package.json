@@ -1,0 +1,52 @@
+{
+  "name": "nodejs-express-sequelize-postgresql",
+  "version": "1.0.0",
+  "description": "Node.js Rest Apis with Express, Sequelize & PostgreSQL",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon index.js",
+    "start": "node index.js",
+    "db:migrate:undo": "npx sequelize-cli db:migrate:undo:all",
+    "db:migrate": "npx sequelize-cli db:migrate",
+    "db:seed:product": "npx sequelize-cli db:seed --seed 20240830025006-product-seeders.js",
+    "db:seed:supplier": "npx sequelize-cli db:seed --seed 20240830024953-supplier-seeders.js",
+    "db:seed:list-po": "npx sequelize-cli db:seed --seed 20240830060713-list-po-seeders.js",
+    "db:seed:list-po-item": "npx sequelize-cli db:seed --seed 20240830060735-list-po-item-seeders.js",
+    "seed-undo": "npx sequelize-cli db:seed:undo:all"
+  },
+  "keywords": [
+    "nodejs",
+    "express",
+    "sequelize",
+    "rest",
+    "api",
+    "postgresql"
+  ],
+  "author": "bezkoder",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.7.7",
+    "body-parser": "^1.20.3",
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.4.0",
+    "firebase": "^11.0.2",
+    "helmet": "^7.1.0",
+    "memory-cache": "^0.2.0",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^6.9.15",
+    "nodemon": "^3.1.4",
+    "pg": "^8.12.0",
+    "pg-hstore": "^2.3.4",
+    "sequelize": "^6.37.3",
+    "serverless-http": "^3.2.0",
+    "twilio": "^5.3.6",
+    "winston": "^3.14.2"
+  },
+  "devDependencies": {
+    "sequelize-cli": "^6.6.2"
+  }
+}
