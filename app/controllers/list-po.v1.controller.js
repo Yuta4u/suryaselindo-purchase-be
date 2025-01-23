@@ -615,10 +615,10 @@ exports.sendPo = async (req, res) => {
           <p>Please find attached the purchase order (${no_po}) for your reference.</p>
           <p>Thank you for your cooperation. Please contact us if you have any questions.</p>
           <p class="signature">Best regards,</p>
-          <p class="signature">PT Simo Teknologi Indonesia Team</p>
+          <p class="signature">PT Surya Selindo Team</p>
         </div>
         <div class="footer">
-          <p>&copy; ${new Date().getFullYear()} PT Simo Teknologi Indonesia. All rights reserved.</p>
+          <p>&copy; ${new Date().getFullYear()} PT Surya Selindo. All rights reserved.</p>
         </div>
       </div>
     </body>
@@ -627,7 +627,7 @@ exports.sendPo = async (req, res) => {
 
   try {
     const message = {
-      from: `"SIMO TEKNOLOGI INDONESIA" <${process.env.EMAIL}>`,
+      from: `SURYA SELINDO <${process.env.EMAIL}>`,
       to: to.split('|'),
       cc: cc.split(',') || undefined,
       bcc: [bcc, process.env.EMAIL] || undefined,
