@@ -152,14 +152,21 @@ exports.topSpendingAmount = async (req, res) => {
         // sorting by higest total amount
         groupBySupplier.sort((a, b) => b.total_amount - a.total_amount)
 
-        const otherData = groupBySupplier.slice(5).reduce((acc, item) => {
-          acc['total_amount'] = acc.total_amount
-            ? acc.total_amount + item.total_amount
+        const otherData = groupBySupplier.slice(5).reduce((otherAcc, item) => {
+          const top5supId = groupBySupplier
+            .slice(0, 5)
+            .reduce((top5Acc, top5Item) => {
+              top5Acc.push(top5Item.supplier_id)
+              return top5Acc
+            }, [])
+
+          otherAcc['total_amount'] = otherAcc.total_amount
+            ? otherAcc.total_amount + item.total_amount
             : item.total_amount
-          acc['approved_at'] = item.approved_at
-          acc['original_supplier'] = 'Others'
-          acc['supplier_id'] = item.supplier_id
-          return acc
+          otherAcc['approved_at'] = item.approved_at
+          otherAcc['original_supplier'] = 'Others'
+          otherAcc['supplier_id'] = top5supId
+          return otherAcc
         }, {})
 
         // filter
@@ -187,7 +194,6 @@ exports.topSpendingAmount = async (req, res) => {
             const indexExistData = acc.findIndex(
               (z) => z.label === e.original_supplier
             )
-
             if (indexExistData === -1) {
               const newData = {
                 label: e.original_supplier,
@@ -199,6 +205,12 @@ exports.topSpendingAmount = async (req, res) => {
               newData.data[index] = Math.round(e.total_amount / 1000000)
               acc.push(newData)
             } else {
+              if (e.original_supplier === 'Others') {
+                acc[indexExistData].supplier_id = [
+                  acc[indexExistData].supplier_id,
+                  e.supplier_id,
+                ]
+              }
               acc[indexExistData].data[index] =
                 acc[indexExistData].data[index] +
                 Math.round(e.total_amount / 1000000)
@@ -233,6 +245,7 @@ exports.getDetailTopSpendingAmount = async (req, res) => {
   try {
     const { supplierId, month, usd, eur, cny, jpy, startDate, endDate } =
       req.query
+
     const indexMonth = (MONTHS.findIndex((m) => m === month) + 1)
       .toString()
       .padStart(2, '0')
@@ -258,6 +271,13 @@ exports.getDetailTopSpendingAmount = async (req, res) => {
     const numEur = parseInt(eur.replace(/\./g, ''), 10)
     const numCny = parseInt(cny.replace(/\./g, ''), 10)
     const numJpy = parseInt(jpy.replace(/\./g, ''), 10)
+
+    const fixSupplierId =
+      supplierId && supplierId.includes(',')
+        ? supplierId.split(',')
+        : supplierId
+
+    console.log(fixSupplierId)
 
     const result = await list_po_items.findAll({
       attributes: [
@@ -310,7 +330,13 @@ exports.getDetailTopSpendingAmount = async (req, res) => {
         {
           model: list_pos,
           attributes: [],
-          where: { approved: 1, supplier_id: supplierId },
+          where: {
+            approved: 1,
+            supplier_id:
+              typeof fixSupplierId === 'object'
+                ? { [Op.notIn]: fixSupplierId }
+                : { [Op.eq]: fixSupplierId },
+          },
           include: [
             {
               model: suppliers,
