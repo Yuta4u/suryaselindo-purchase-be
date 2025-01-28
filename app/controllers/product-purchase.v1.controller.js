@@ -2,6 +2,8 @@ const { product_purchases, products, suppliers } = require('../../models')
 const { errorHandling } = require('../utils/error-handling')
 
 exports.getProductPurchase = async (req, res) => {
+  console.log('hit cuy')
+
   try {
     const data = await product_purchases.findAll({
       include: [
