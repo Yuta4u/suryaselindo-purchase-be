@@ -5,5 +5,3 @@ module.exports = (app) => {
   router.get('/', product_purchase.getProductPurchase)
   app.use('/api/v1/product-purchase', router)
 }
-
-// a
