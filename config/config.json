@@ -1,23 +1,23 @@
 {
   "development": {
     "username": "postgres",
-    "password": "p@ssw0rd",
-    "database": "cursed-db-two",
-    "host": "192.168.60.240",
+    "password": "Tomzriderx02",
+    "database": "db-cursed-two",
+    "host": "localhost",
     "dialect": "postgres"
   },
   "test": {
     "username": "postgres",
-    "password": "p@ssw0rd",
-    "database": "cursed-db-two",
-    "host": "192.168.60.240",
+    "password": "Tomzriderx02",
+    "database": "db-cursed-two",
+    "host": "localhost",
     "dialect": "postgres"
   },
   "production": {
     "username": "postgres",
-    "password": "p@ssw0rd",
-    "database": "cursed-db-two",
-    "host": "192.168.60.240",
+    "password": "Tomzriderx02",
+    "database": "db-cursed-two",
+    "host": "localhost",
     "dialect": "postgres"
   }
 }

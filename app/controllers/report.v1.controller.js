@@ -115,7 +115,7 @@ exports.topSpendingAmount = async (req, res) => {
       const totalPo = {
         label: 'Total Po',
         data: new Array(range).fill(null),
-        backgroundColor: '#EB5A3C',
+        backgroundColor: '#A6AEBF',
         stack: 'Stack 0',
       }
 
