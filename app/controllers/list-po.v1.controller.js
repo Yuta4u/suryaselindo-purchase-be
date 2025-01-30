@@ -41,7 +41,7 @@ const functionGenerateNoPo = async () => {
       Number(latest_list_po[0]?.dataValues?.no_po?.split('/')[0]) || 0
     const po_number = formatPoNumber(latest_no_po + 1)
     const month = romawi[new Date().getMonth()]
-    const no_po = `${po_number}/PO/STI/${month}/${year}`
+    const no_po = `${po_number}/PO/SS/${month}/${year}`
     return no_po
   } catch (error) {
     errorHandling(500, 'Something went wrong when generate new no po')
