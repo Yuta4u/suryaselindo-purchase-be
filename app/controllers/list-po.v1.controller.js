@@ -17,323 +17,145 @@ const { sendWhatsappNotification } = require('../utils/twilio')
 const { logger } = require('../utils/logger')
 const { approveNotification } = require('../utils/approve-po-twilio')
 const { errorHandling } = require('../utils/error-handling')
+const { AsyncHandler, TransactionHandler } = require('../utils/async-handler')
+const { ErrorAppHandler } = require('../utils/error-handler')
+const { ValidatePoItem } = require('../helpers/list-po-item.helpers')
+const { ValidateCreatePo } = require('../helpers/list-po.helpers')
+const SuccessHandler = require('../utils/success-handler')
 
 // GENERATE NEW NO PO
-const functionGenerateNoPo = async () => {
-  try {
-    const year = new Date().getFullYear()
-    const latest_list_po = await list_pos.findAll({
-      limit: 1,
-      order: [[literal("CAST(SPLIT_PART(no_po, '/', 1) AS INTEGER)"), 'DESC']], // Sort by the numeric part
-      where: {
-        no_po: { [Op.ne]: null },
-        [Op.and]: [
-          where(
-            literal("SPLIT_PART(no_po, '/', 5)"), // Extract year part
-            year.toString()
-          ),
+const functionGenerateNoPo = AsyncHandler(async () => {
+  const year = new Date().getFullYear()
+  const latest_list_po = await list_pos.findAll({
+    limit: 1,
+    order: [[literal("CAST(SPLIT_PART(no_po, '/', 1) AS INTEGER)"), 'DESC']], // Sort by the numeric part
+    where: {
+      no_po: { [Op.ne]: null },
+      [Op.and]: [
+        where(
+          literal("SPLIT_PART(no_po, '/', 5)"), // Extract year part
+          year.toString()
+        ),
+      ],
+    },
+    attributes: ['no_po'],
+  })
+
+  const latest_no_po =
+    Number(latest_list_po[0]?.dataValues?.no_po?.split('/')[0]) || 0
+  const po_number = formatPoNumber(latest_no_po + 1)
+  const month = romawi[new Date().getMonth()]
+  const no_po = `${po_number}/PO/STI/${month}/${year}`
+  return no_po
+})
+
+// ========================== HANDLE CREATE PO ==============================
+exports.CreatePO = TransactionHandler(async (req, res, next, transaction) => {
+  const validateData = ValidateCreatePo(req.body)
+  const { name, supplier_id, prepared_by, note, no_po, data, reff_no } =
+    validateData
+
+  let existingPo = null
+
+  // Logic to handle existing PO
+  if (no_po) {
+    existingPo = await list_pos.findOne({
+      where: { no_po },
+      transaction,
+      lock: transaction.LOCK.UPDATE, // Menghindari race condition
+    })
+
+    if (existingPo) {
+      await Promise.all([
+        list_pos.update(
+          { no_po_revised: no_po, canceled: 1 },
+          { where: { no_po }, transaction }
+        ),
+        list_po_items.update(
+          { approved: 0 },
+          { where: { list_po_id: existingPo.id }, transaction }
+        ),
+      ])
+    }
+  }
+
+  const newPO = await list_pos.create(
+    {
+      name,
+      no_po,
+      supplier_id,
+      prepared_by,
+      note,
+      reff_no,
+    },
+    { transaction }
+  )
+
+  if (data?.length > 0) {
+    const validatedPoItems = await Promise.all(
+      data.map((item) => ValidatePoItem(item, newPO.id))
+    )
+    await list_po_items.bulkCreate(validatedPoItems, { transaction })
+  }
+
+  return SuccessHandler(res, 'Successfully created PO')
+})
+
+// ========================== HANDLE GET ALL NO PO ==============================
+exports.GetAllNoPO = AsyncHandler(async (req, res) => {
+  const data = await list_pos.findAll({
+    where: {
+      approved: 1,
+      canceled: 0,
+    },
+    attributes: ['no_po'],
+    order: [['no_po', 'DESC']],
+  })
+  return SuccessHandler(res, 'Successfully retrieved all list no po', data)
+})
+
+// ========================== HANDLE GET ALL PO ==============================
+exports.GetAllPO = AsyncHandler(async (req, res) => {
+  const data = await list_pos.findAll({
+    where: {
+      approved: 0,
+      rejected: 0,
+      canceled: 0,
+    },
+    include: [
+      {
+        model: list_po_items,
+        as: 'list_po_items',
+        include: [
+          {
+            model: products,
+          },
         ],
       },
-      attributes: ['no_po'],
-    })
+    ],
+    order: [['id', 'DESC']],
+  })
+  return SuccessHandler(res, 'Successfully retrieved all list po', data)
+})
 
-    const latest_no_po =
-      Number(latest_list_po[0]?.dataValues?.no_po?.split('/')[0]) || 0
-    const po_number = formatPoNumber(latest_no_po + 1)
-    const month = romawi[new Date().getMonth()]
-    const no_po = `${po_number}/PO/STI/${month}/${year}`
-    return no_po
-  } catch (error) {
-    errorHandling(500, 'Something went wrong when generate new no po')
+// ========================== HANDLE DELETE PO ==============================
+exports.DeletePO = AsyncHandler(async (req, res) => {
+  const id = Number(req.params.id)
+
+  if (isNaN(id) || id <= 0) {
+    throw ErrorAppHandler('Invalid ID. Please provide a valid numeric ID.', 400)
   }
-}
 
-exports.create = async (req, res) => {
-  const transaction = await db.sequelize.transaction()
-
-  try {
-    const { name, supplier_id, prepared_by, note, no_po, data, reff_no } =
-      req.body
-
-    // Validate required fields
-    if (!supplier_id) {
-      errorHandling(400, 'Supplier ID and PO number are required')
-    }
-
-    // Find supplier first to ensure it exists
-    const supplier = await suppliers.findByPk(supplier_id)
-    if (!supplier) {
-      errorHandling(404, 'Supplier Not Found')
-    }
-
-    if (no_po) {
-      // Handle existing PO
-      const existingPo = await list_pos.findOne({
-        where: { no_po },
-      })
-
-      if (existingPo) {
-        // Cancel existing PO and its items
-        await Promise.all([
-          list_pos.update(
-            {
-              no_po_revised: no_po,
-              canceled: 1,
-            },
-            {
-              where: { no_po },
-            }
-          ),
-          list_po_items.update(
-            { approved: 0 },
-            {
-              where: { list_po_id: existingPo.id },
-            }
-          ),
-        ])
-      }
-    }
-
-    // Create new PO
-    const newPO = await list_pos.create(
-      {
-        name,
-        no_po,
-        supplier_id,
-        prepared_by,
-        note,
-        reff_no,
-      },
-      { transaction }
-    )
-
-    // Create PO items if data exists
-    if (data?.length > 0) {
-      // Validate PO items
-      const validatedPoItems = data.map((item) => {
-        if (!item.id || !item.quantity || !item.price) {
-          errorHandling(400, 'Invalid PO item: missing required fields')
-        }
-
-        return {
-          list_po_id: newPO.id,
-          quantity: item.quantity,
-          price: item.price,
-          total_price: item.total_price || item.quantity * item.price,
-          product_id: item.id,
-          barcode: item.barcode,
-        }
-      })
-
-      await list_po_items.bulkCreate(validatedPoItems, { transaction })
-    }
-
-    // Commit transaction
-    await transaction.commit()
-
-    // Optional: Send notification
-    await sendWhatsappNotification(supplier.name, prepared_by)
-
-    return res.status(201).json({
-      message: 'Successfully created Purchase Order',
-      data: newPO,
-    })
-  } catch (error) {
-    // Rollback transaction
-    await transaction.rollback()
-
-    // Log detailed error
-    logger.error('Error in PO creation', {
-      error: error.message,
-      stack: error.stack,
-    })
-
-    const statusCode = error.statusCode || 500
-    return res.status(statusCode).send({
-      message: error.message || 'Internal Server Error',
-    })
+  const listPo = await list_pos.findOne({ where: { id } })
+  if (!listPo) {
+    throw ErrorAppHandler(`List PO with ID ${id} not found`)
   }
-}
 
-exports.findAllNoPo = async (req, res) => {
-  try {
-    const data = await list_pos.findAll({
-      where: {
-        approved: 1,
-        canceled: 0,
-      },
-      attributes: ['no_po'],
-      order: [['no_po', 'DESC']],
-    })
-
-    return res.status(200).send({
-      message: 'Successfully retrieved all list no po',
-      data,
-    })
-  } catch (error) {
-    logger.error('Error in list_pos.findAllNoPo', { error })
-    const statusCode = error.statusCode || 500
-    return res.status(statusCode).send({
-      message: error.message || 'Internal Server Error',
-    })
-  }
-}
-
-// USED
-exports.findAll = async (req, res) => {
-  try {
-    const data = await list_pos.findAll({
-      where: {
-        approved: 0,
-        rejected: 0,
-        canceled: 0,
-      },
-      include: [
-        {
-          model: list_po_items,
-          as: 'list_po_items',
-          include: [
-            {
-              model: products,
-            },
-          ],
-        },
-      ],
-      order: [['id', 'DESC']],
-    })
-
-    return res.status(200).send({
-      message: 'Successfully retrieved all list po',
-      data,
-    })
-  } catch (error) {
-    logger.error('Error in list_pos.getAll', { error })
-    const statusCode = error.statusCode || 500
-    return res.status(statusCode).send({
-      message: error.message || 'Internal Server Error',
-    })
-  }
-}
-
-exports.findAllLvl1 = async (req, res) => {
-  try {
-    const data = await list_pos.findAll({
-      include: [
-        {
-          model: list_po_items,
-          as: 'list_po_items',
-        },
-      ],
-    })
-    res.send({
-      message: 'berhasil get all list po lvl 1',
-      data: data,
-    })
-  } catch (err) {
-    console.log(err, 'ini error')
-    res.send({
-      message: 'Some error occurred while retrieving list po',
-    })
-  }
-}
-
-exports.findAllLvl2 = async (req, res) => {
-  try {
-    const data = await list_pos.findAll({
-      include: [
-        {
-          model: list_po_items,
-          as: 'list_po_items',
-          include: [
-            {
-              model: products,
-            },
-          ],
-        },
-      ],
-    })
-    res.send({
-      message: 'berhasil get all list po lvl 2',
-      data: data,
-    })
-  } catch (err) {
-    console.log(err, 'ini error')
-    res.send({
-      message: 'Some error occurred while retrieving list po',
-    })
-  }
-}
-
-exports.findAllLvl3 = async (req, res) => {
-  try {
-    const data = await list_pos.findAll({
-      include: [
-        {
-          model: list_po_items,
-          as: 'list_po_items',
-          include: [
-            {
-              model: products,
-              include: [
-                {
-                  model: product_barcodes,
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    })
-    res.send({
-      message: 'berhasil get all list po lvl 1',
-      data: data,
-    })
-  } catch (error) {
-    const statusCode = error.statusCode || 500
-    return res.status(statusCode).send({
-      message: error.message || 'Internal Server Error',
-    })
-  }
-}
-
-// USED
-exports.delete = async (req, res) => {
-  try {
-    const id = Number(req.params.id)
-
-    // Validate input: ensure ID is a valid number
-    if (isNaN(id) || id <= 0) {
-      errorHandling(400, 'Invalid ID. Please provide a valid numeric ID.')
-    }
-
-    // Check if the record with the given ID exists
-    const listPo = await list_pos.findOne({ where: { id } })
-    if (!listPo) {
-      errorHandling(404, `List PO with ID ${id} not found.`)
-    }
-
-    // Delete the record
-    await list_pos.destroy({ where: { id } })
-
-    // Success response
-    return res.status(200).json({
-      status: 'success',
-      id: id,
-      message: 'List po deleted successfully.',
-    })
-  } catch (error) {
-    // Log error for development or debugging purposes
-    logger.error('Error in list_pos.delete', { error })
-
-    const statusCode = error.statusCode || 500
-    return res.status(statusCode).send({
-      message: error.message || 'Internal Server Error',
-    })
-  }
-}
+  await list_pos.destroy({ where: { id } })
+  return SuccessHandler(res, 'Successfully delete List PO')
+})
 
 // ========================== HANDLE APPROVE ==============================
-// USED
 const sortItems = (data) => {
   const pendingItems = []
   const rejectItems = []
@@ -349,7 +171,6 @@ const sortItems = (data) => {
   return [pendingItems, rejectItems, approveItems]
 }
 
-// USED
 const handlePendingItems = async (pendingItems, list_po, name, transaction) => {
   if (pendingItems.length === 0) return null
 
@@ -384,7 +205,6 @@ const handlePendingItems = async (pendingItems, list_po, name, transaction) => {
   return pendingListPo
 }
 
-// USED
 const handleRejectItems = async (rejectItems, list_po, transaction) => {
   if (rejectItems.length === 0) return null
 
@@ -417,7 +237,6 @@ const handleRejectItems = async (rejectItems, list_po, transaction) => {
   return rejectListPo
 }
 
-// USED
 const handleApproveItems = async (approveItems, transaction) => {
   if (approveItems.length === 0) return
 
@@ -444,7 +263,7 @@ const updateMainPO = async (id, thereIsApprove, no_po, transaction) => {
       }
     )
     // APPROVE NOTIFCATION TO YUNI
-    await approveNotification({ no_po: newNoPo })
+    // await approveNotification({ no_po: newNoPo })
   } else {
     await list_pos.destroy({
       where: { id },
@@ -453,99 +272,70 @@ const updateMainPO = async (id, thereIsApprove, no_po, transaction) => {
   }
 }
 
-// USED
-exports.handleApprove = async (req, res) => {
-  const transaction = await db.sequelize.transaction()
-  try {
-    const { id, name, no_po, data } = req.body
+exports.ApprovePO = TransactionHandler(async (req, res, next, transaction) => {
+  const { id, name, no_po, data } = req.body
 
-    const list_po = await list_pos.findByPk(id, { transaction })
-    if (!list_po) {
-      errorHandling(404, 'PO Not Found')
-    }
-
-    const [pendingItems, rejectItems, approveItems] = sortItems(data)
-
-    await Promise.all([
-      handlePendingItems(pendingItems, list_po, name, transaction),
-      handleRejectItems(rejectItems, list_po, transaction),
-      handleApproveItems(approveItems, transaction),
-    ])
-
-    const thereIsApprove = approveItems.length > 0
-
-    await updateMainPO(id, thereIsApprove, no_po, transaction)
-
-    // // Commit transaksi
-    await transaction.commit()
-
-    res.status(200).json({
-      message: 'Successfully processed list PO',
-      data: { id },
-    })
-  } catch (error) {
-    // Rollback transaksi jika terjadi kesalahan
-    await transaction.rollback()
-    const statusCode = error.statusCode || 500
-    return res.status(statusCode).send({
-      message: error.message || 'Internal Server Error',
-    })
+  const list_po = await list_pos.findByPk(id, { transaction })
+  if (!list_po) {
+    throw ErrorAppHandler('PO Not Found', 404)
   }
-}
 
-// USED
-exports.approved = async (req, res) => {
-  try {
-    const data = await list_pos.findAll({
-      order: [
-        [fn('RIGHT', fn('REPLACE', col('no_po'), ' (Revised)', ''), 4), 'DESC'],
-        [
-          fn('SUBSTRING', fn('REPLACE', col('no_po'), ' (Revised)', ''), 1, 4),
-          'DESC',
-        ],
+  const [pendingItems, rejectItems, approveItems] = sortItems(data)
+
+  await Promise.all([
+    handlePendingItems(pendingItems, list_po, name, transaction),
+    handleRejectItems(rejectItems, list_po, transaction),
+    handleApproveItems(approveItems, transaction),
+  ])
+
+  const thereIsApprove = approveItems.length > 0
+
+  await updateMainPO(id, thereIsApprove, no_po, transaction)
+
+  return SuccessHandler(res, 'Successfully processed List PO')
+})
+
+// ========================== HANDLE GET ALL APPROVED PO ==============================
+exports.GetAllApprovedPO = AsyncHandler(async (req, res) => {
+  const data = await list_pos.findAll({
+    order: [
+      [fn('RIGHT', fn('REPLACE', col('no_po'), ' (Revised)', ''), 4), 'DESC'],
+      [
+        fn('SUBSTRING', fn('REPLACE', col('no_po'), ' (Revised)', ''), 1, 4),
+        'DESC',
       ],
+    ],
 
-      where: {
-        approved: 1,
-        canceled: 0,
-      },
+    where: {
+      approved: 1,
+      canceled: 0,
+    },
 
-      include: [
-        {
-          model: list_po_items,
-          as: 'list_po_items',
-          where: {
-            approved: 1,
+    include: [
+      {
+        model: list_po_items,
+        as: 'list_po_items',
+        where: {
+          approved: 1,
+        },
+        required: false,
+        include: [
+          {
+            model: products,
           },
-          required: false,
-          include: [
-            {
-              model: products,
-            },
-          ],
-        },
-        {
-          model: suppliers,
-          attributes: ['name', 'email', 'phone_no', 'fax_no', 'address', 'pic'],
-        },
-      ],
-    })
-
-    return res.status(200).json({
-      message: 'Successfully retrieved all approved list po',
-      data,
-    })
-  } catch (error) {
-    logger.error('Error in list_pos.approved', { error })
-    const statusCode = error.statusCode || 500
-    return res.status(statusCode).send({
-      message: error.message || 'Internal Server Error',
-    })
-  }
-}
+        ],
+      },
+      {
+        model: suppliers,
+        attributes: ['name', 'email', 'phone_no', 'fax_no', 'address', 'pic'],
+      },
+    ],
+  })
+  return SuccessHandler(res, 'Successfully get all Approved PO', data)
+})
 
 // test
-exports.sendPo = async (req, res) => {
+exports.sendPo = AsyncHandler(async (req, res) => {
   const { name, no_po, msg, cc, to, subject, bcc, id } = req.body
 
   const htmlTemplate = `
@@ -626,53 +416,48 @@ exports.sendPo = async (req, res) => {
   </html>
   `
 
-  try {
-    const message = {
-      from: `SURYA SELINDO <${process.env.EMAIL}>`,
-      to: to.split('|'),
-      cc: cc.split(',') || undefined,
-      bcc: [bcc, process.env.EMAIL] || undefined,
-      subject: subject || `Purchase Order ${no_po}`,
-      text: `Please find the attached PO document (${no_po}).${
-        msg ? ` Message: ${msg}` : ''
-      }`,
-      html: htmlTemplate,
-      attachments: [
-        {
-          filename: `${no_po}.pdf`,
-          content: req.file.buffer,
-          contentType: 'application/pdf',
-        },
-      ],
-      headers: {
-        'X-Priority': '1',
-        'X-MSMail-Priority': 'High',
-        Importance: 'high',
-        'Return-Path': process.env.EMAIL, // Return-Path address
+  const message = {
+    from: `SURYA SELINDO <${process.env.EMAIL}>`,
+    to: to.split('|'),
+    cc: cc.split(',') || undefined,
+    bcc: [bcc, process.env.EMAIL] || undefined,
+    subject: subject || `Purchase Order ${no_po}`,
+    text: `Please find the attached PO document (${no_po}).${
+      msg ? ` Message: ${msg}` : ''
+    }`,
+    html: htmlTemplate,
+    attachments: [
+      {
+        filename: `${no_po}.pdf`,
+        content: req.file.buffer,
+        contentType: 'application/pdf',
       },
-      replyTo: process.env.EMAIL, // Reply-To address
-    }
-
-    // Send email
-    const info = await transporter.sendMail(message)
-
-    // Update database
-    const [updatedRowsCount] = await list_pos.update(
-      { sended: 1 },
-      { where: { id } }
-    )
-
-    if (updatedRowsCount === 0) {
-      errorHandling(404, 'No matching record found to update')
-    }
-
-    res.status(200).json({
-      message: 'PO sent successfully',
-    })
-  } catch (error) {
-    const statusCode = error.statusCode || 500
-    return res.status(statusCode).send({
-      message: error.message || 'Internal Server Error',
-    })
+    ],
+    headers: {
+      'X-Priority': '1',
+      'X-MSMail-Priority': 'High',
+      Importance: 'high',
+      'Return-Path': process.env.EMAIL, // Return-Path address
+    },
+    replyTo: process.env.EMAIL, // Reply-To address
   }
-}
+
+  // Send email
+  const info = await transporter.sendMail(message)
+
+  // Update database
+  const [updatedRowsCount] = await list_pos.update(
+    { sended: 1 },
+    { where: { id } }
+  )
+
+  if (updatedRowsCount === 0) {
+    throw ErrorAppHandler('No matching record found to update', 404)
+  }
+
+  return SuccessHandler(res, 'Successfully! PO has been sent')
+
+  res.status(200).json({
+    message: 'PO sent successfully',
+  })
+})

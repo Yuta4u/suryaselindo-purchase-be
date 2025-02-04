@@ -1,7 +1,7 @@
 const API_CONFIG = {
-  BASE_URL: process.env.BASE_URL,
-  CLIENT_ID: process.env.CLIENT_ID,
-  CLIENT_SECRET: process.env.CLIENT_SECRET,
+  BASE_URL: 'http://192.168.60.240:25565/',
+  CLIENT_ID: '9de069e4-ec8e-4484-8ef5-64547d165318',
+  CLIENT_SECRET: 'MgF2Ai0NqyqJX9ZpCcJ3seiF6pDfkmc0kLzEb2tY',
   ENDPOINTS: {
     TOKEN: 'oauth/token',
     USER: 'getUser',
@@ -29,6 +29,11 @@ exports.getToken = async (req, res, next) => {
       username,
       password,
     }
+
+    // tommy@suryaselindo.com
+    // asdf1234
+
+    console.log(tokenData, 'ini token data')
 
     const response = await fetch(
       `${process.env.BASE_URL}${API_CONFIG.ENDPOINTS.TOKEN}`,
@@ -81,6 +86,6 @@ exports.getUser = async (req, res, next) => {
 
     res.status(201).json({ status_code: 201, ...data })
   } catch (error) {
-    next(error) // Pass error to global handler
+    next(error)
   }
 }

@@ -5,7 +5,7 @@ module.exports = (app) => {
   })
 
   // GET
-  router.get('/', product_grade.getAll)
+  router.get('/', product_grade.ProductGrade)
 
   app.use('/api/v1/product-grade', router)
 }

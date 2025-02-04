@@ -2,21 +2,21 @@
   "development": {
     "username": "postgres",
     "password": "Tomzriderx02",
-    "database": "db-cursed-two",
+    "database": "purchase",
     "host": "localhost",
     "dialect": "postgres"
   },
   "test": {
     "username": "postgres",
     "password": "Tomzriderx02",
-    "database": "db-cursed-two",
+    "database": "purchase",
     "host": "localhost",
     "dialect": "postgres"
   },
   "production": {
     "username": "postgres",
     "password": "Tomzriderx02",
-    "database": "db-cursed-two",
+    "database": "purchase",
     "host": "localhost",
     "dialect": "postgres"
   }

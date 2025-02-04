@@ -3,8 +3,8 @@ module.exports = (app) => {
   var router = require('express').Router()
 
   // GET
-  router.get('/topspendingamount', report.topSpendingAmount)
-  router.get('/detailtopspending', report.getDetailTopSpendingAmount)
+  router.get('/topspendingamount', report.TopSpendingAmount)
+  router.get('/detailtopspending', report.GetDetailTopSpendingAmount)
 
   app.use('/api/v1/report', router)
 }

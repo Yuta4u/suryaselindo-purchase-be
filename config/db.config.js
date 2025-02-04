@@ -32,7 +32,7 @@ const config = {
   development: {
     username: 'postgres',
     password: 'Tomzriderx02',
-    database: 'db-cursed-two',
+    database: 'purchase',
     host: 'localhost',
     dialect: 'postgres',
     dialecModule: pg,
@@ -40,7 +40,7 @@ const config = {
   test: {
     username: 'postgres',
     password: 'Tomzriderx02',
-    database: 'db-cursed-two',
+    database: 'purchase',
     host: 'localhost',
     dialect: 'postgres',
     dialecModule: pg,
@@ -48,7 +48,7 @@ const config = {
   production: {
     username: 'postgres',
     password: 'Tomzriderx02',
-    database: 'db-cursed-two',
+    database: 'purchase',
     host: 'localhost',
     dialect: 'postgres',
     dialecModule: pg,

@@ -6,13 +6,13 @@ module.exports = (app) => {
   var router = require('express').Router()
 
   // GET
-  router.get('/', product.findAll)
-  router.get('/:id', product.findAllBySupplierId)
+  router.get('/', product.Product)
+  router.get('/:id', product.ProductBySupplierId)
 
   // POST
-  router.post('/', uploadSingle, product.create)
+  router.post('/', uploadSingle, product.CreateProduct)
 
   // PUT
-  router.put('/update-product', product.updateProduct)
+  router.put('/update-product', product.UpdateProduct)
   app.use('/api/v1/product', router)
 }

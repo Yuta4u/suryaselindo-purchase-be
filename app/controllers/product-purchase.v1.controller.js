@@ -1,30 +1,20 @@
 const { product_purchases, products, suppliers } = require('../../models')
-const { errorHandling } = require('../utils/error-handling')
+const { AsyncHandler } = require('../utils/async-handler')
+const SuccessHandler = require('../utils/success-handler')
 
-exports.getProductPurchase = async (req, res) => {
-  console.log('hit cuy')
-
-  try {
-    const data = await product_purchases.findAll({
-      include: [
-        {
-          model: products,
-          as: 'product',
-        },
-        {
-          model: suppliers,
-          as: 'supplier',
-        },
-      ],
-    })
-    return res.status(201).send({
-      message: 'No Data Found',
-      data,
-    })
-  } catch (error) {
-    const statusCode = error.statusCode || 500
-    return res.status(statusCode).send({
-      message: error.message || 'Internal Server Error',
-    })
-  }
-}
+// ========================== HANDLE GET ALL PRODUCT GROUP ==============================
+exports.ProductPurchase = AsyncHandler(async (req, res) => {
+  const data = await product_purchases.findAll({
+    include: [
+      {
+        model: products,
+        as: 'product',
+      },
+      {
+        model: suppliers,
+        as: 'supplier',
+      },
+    ],
+  })
+  return SuccessHandler(res, 'Successfully! get all product purchase', data)
+})

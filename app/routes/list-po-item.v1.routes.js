@@ -4,13 +4,13 @@ module.exports = (app) => {
   var router = require('express').Router()
 
   // GET
-  router.get('/', list_po_item.findAll)
-  router.get('/approved', list_po_item.findAllApproved)
-  router.get('/rejected', list_po_item.findAllRejected)
-  router.get('/approved/:name', list_po_item.findAllApprovedBySupplierName)
+  router.get('/', list_po_item.ListPoItem)
+  router.get('/approved', list_po_item.ApprovedListPoItem)
+  router.get('/rejected', list_po_item.RejectedListPoItem)
+  // router.get('/approved/:name', list_po_item.findAllApprovedBySupplierName)
   // router.get("/with-product", list_po_item.findAllWithProduct)
 
   // POST
-  router.post('/', list_po_item.create)
+  // router.post('/', list_po_item.CreateListPoItem)
   app.use('/api/v1/list-po-item', router)
 }

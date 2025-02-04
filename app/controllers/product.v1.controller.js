@@ -16,12 +16,17 @@ const { normalizePrice } = require('../utils/normalize-price')
 const { updatePriceNotification } = require('../utils/update-price-twilio')
 const { NumericPrice } = require('../utils/numeric-price')
 const { errorHandling } = require('../utils/error-handling')
+const { TransactionHandler, AsyncHandler } = require('../utils/async-handler')
+const { ErrorAppHandler } = require('../utils/error-handler')
+const { ValidateProduct } = require('../helpers/product.helpers')
+const SuccessHandler = require('../utils/success-handler')
 
-exports.create = async (req, res) => {
-  const t = await db.sequelize.transaction()
-  let uploadedImageUrl = null
+// ========================== HANDLE CREATE PRODUCT ==============================
+exports.CreateProduct = TransactionHandler(
+  async (req, res, next, transaction) => {
+    ValidateProduct(req.body)
+    let uploadedImageUrl = null
 
-  try {
     let {
       alias,
       currency,
@@ -36,24 +41,7 @@ exports.create = async (req, res) => {
       uom,
     } = req.body
 
-    // Validation improvements
-    if (
-      !currency ||
-      !price ||
-      !product_grade ||
-      !product_brand ||
-      !product_group ||
-      !product_type ||
-      !product_variant ||
-      !supplier ||
-      !uom
-    ) {
-      errorHandling(400, 'Missing required fields')
-    }
-
-    if (!/^[\d.,]+$/.test(price)) {
-      errorHandling(400, 'Invalid price format.')
-    }
+    // validation
 
     // Centralize findOrCreateEntry logic
     const findOrCreateEntry = async (model, value) => {
@@ -72,7 +60,7 @@ exports.create = async (req, res) => {
       const [entry] = await model.findOrCreate({
         where: { name: value },
         defaults: { name: value },
-        transaction: t,
+        transaction,
       })
 
       return {
@@ -107,7 +95,7 @@ exports.create = async (req, res) => {
           4
         )}${pad(productId, 5)}`
       } catch (error) {
-        errorHandling(402, 'Failed to generate barcode')
+        throw ErrorAppHandler('Failed to generate barcode', 402)
       }
     }
 
@@ -118,9 +106,9 @@ exports.create = async (req, res) => {
       })
 
       if (existingBarcode) {
-        errorHandling(
-          403,
-          'Barcode already exists. Please use a different one.'
+        throw ErrorAppHandler(
+          'Barcode already exists. Please use different one.',
+          400
         )
       }
     } else {
@@ -133,24 +121,23 @@ exports.create = async (req, res) => {
       )
     }
 
-    // Image upload with more robust validation
-    if (req.file) {
-      const image = req.file
-      const MAX_IMAGE_SIZE = 5 * 1024 * 1024 // 5MB
-      const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+    // // Image upload with more robust validation
+    // if (req.file) {
+    //   const image = req.file
+    //   const MAX_IMAGE_SIZE = 5 * 1024 * 1024 // 5MB
+    //   const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
-      if (!ALLOWED_TYPES.includes(image.mimetype)) {
-        errorHandling(400, 'Invalid image type. Allowed: JPEG, PNG, WebP')
-      }
+    //   if (!ALLOWED_TYPES.includes(image.mimetype)) {
+    //     errorHandling(400, 'Invalid image type. Allowed: JPEG, PNG, WebP')
+    //   }
 
-      if (image.size > MAX_IMAGE_SIZE) {
-        errorHandling(400, 'Image exceeds max size of 5MB')
-      }
+    //   if (image.size > MAX_IMAGE_SIZE) {
+    //     errorHandling(400, 'Image exceeds max size of 5MB')
+    //   }
 
-      uploadedImageUrl = await storeImage(image)
-    }
+    //   uploadedImageUrl = await storeImage(image)
+    // }
 
-    // Prepare product data with improved naming
     const newProductData = {
       name: product_grade,
       alias: alias || `${processedGroup.name}-${processedVariant.name}`,
@@ -173,7 +160,7 @@ exports.create = async (req, res) => {
 
     // Create product with transaction
     const createdProduct = await products.create(newProductData, {
-      transaction: t,
+      transaction,
     })
 
     // Create barcode entry
@@ -182,168 +169,111 @@ exports.create = async (req, res) => {
         barcode,
         product_id: createdProduct.id,
       },
-      { transaction: t }
+      { transaction }
     )
 
-    // Commit transaction
-    await t.commit()
-
-    res.status(201).json({
-      message: 'Product created successfully',
-      productId: createdProduct.id,
-    })
-  } catch (error) {
-    // Rollback transaction
-    await t.rollback()
-
-    if (uploadedImageUrl) {
-      await deleteImageFromFirebase(uploadedImageUrl)
-    }
-    const statusCode = error.statusCode || 500
-    return res.status(statusCode).send({
-      message: error.message || 'Internal Server Error',
-    })
+    return SuccessHandler(res, 'Product created successfully!', '', 201)
   }
-}
+)
 
-exports.findAll = async (req, res) => {
-  try {
-    const data = await products.findAll({
-      where: {
-        id: {
-          [Op.ne]: 1,
-        },
+// ========================== HANDLE GET ALL PRODUCT ==============================
+exports.Product = AsyncHandler(async (req, res) => {
+  const data = await products.findAll({
+    where: {
+      id: {
+        [Op.ne]: 1,
       },
-      include: [
-        {
-          model: product_barcodes,
-          attributes: ['barcode'],
-          required: true, // Perbaikan dari "require" ke "required"
-        },
-      ],
-    })
-
-    return res.status(200).json({
-      message: 'Successfully retrieved all products',
-      data,
-    })
-  } catch (error) {
-    logger.error('Error in products.findAll', { error })
-    const statusCode = error.statusCode || 500
-    return res.status(statusCode).send({
-      message: error.message || 'Internal Server Error',
-    })
-  }
-}
-
-exports.updateProduct = async (req, res) => {
-  const t = await db.sequelize.transaction()
-  try {
-    const { product_id, price, barcode } = req.body
-
-    if (!product_id) {
-      errorHandling(400, 'Product ID is Required')
-    }
-
-    const updateData = {}
-
-    if (price) {
-      updateData.price = NumericPrice(price)
-    }
-
-    if (barcode) {
-      // Check if barcode already exists
-      const existingBarcode = await product_barcodes.findOne({
-        where: { barcode },
-      })
-
-      if (existingBarcode) {
-        errorHandling(400, 'Barcode already exists for another product')
-      }
-
-      updateData.barcode = barcode
-
-      // test
-      const [barcodeUpdateCount] = await product_barcodes.update(
-        { barcode },
-        { where: { product_id }, transaction: t }
-      )
-
-      if (barcodeUpdateCount === 0) {
-        errorHandling(404, 'Barcode not found for the specified product')
-      }
-    }
-
-    if (Object.keys(updateData).length === 0) {
-      errorHandling(400, 'No valid fields to update')
-    }
-
-    const [updatedRowsCount] = await products.update(updateData, {
-      where: { id: product_id },
-      transaction: t,
-    })
-
-    if (updatedRowsCount === 0) {
-      errorHandling(404, 'Product not found')
-    }
-
-    // await updatePriceNotification(msgParam)
-    await t.commit()
-
-    // await updatePriceNotification(msgParam)
-    return res.status(200).json({
-      message: 'Successfully updated product',
-    })
-  } catch (error) {
-    await t.rollback()
-    logger.error('Error in product.updatePrice', {
-      error: error.message,
-      productId: req.body.product_id,
-    })
-
-    const statusCode = error.statusCode || 500
-    return res.status(statusCode).send({
-      message: error.message || 'Internal Server Error',
-    })
-  }
-}
-
-// USED
-exports.findAllBySupplierId = async (req, res) => {
-  try {
-    const data = await products.findAll({
-      where: {
-        supplier_id: req.params.id,
-        deleted_at: null,
+    },
+    include: [
+      {
+        model: product_barcodes,
+        attributes: ['barcode'],
+        required: true,
       },
-      attributes: [
-        'id',
-        'name',
-        'product_variant_name',
-        'barcode',
-        'uom',
-        'stock',
-        'currency',
-        'price',
-      ],
-      include: [
-        {
-          model: product_barcodes,
-          attributes: ['barcode'],
-          require: false,
-        },
-      ],
+    ],
+  })
+
+  return SuccessHandler(res, 'Successfully! get all product', data)
+})
+
+// ========================== HANDLE UPDATE PRODUCT ==============================
+exports.UpdateProduct = AsyncHandler(async (req, res, next, transaction) => {
+  const { product_id, price, barcode } = req.body
+
+  if (!product_id) {
+    throw ErrorAppHandler('Product ID is required', 400)
+  }
+
+  const updateData = {}
+
+  if (price) {
+    updateData.price = NumericPrice(price)
+  }
+
+  if (barcode) {
+    // Check if barcode already exists
+    const existingBarcode = await product_barcodes.findOne({
+      where: { barcode },
     })
 
-    return res.status(200).send({
-      message: 'Successfully retrieved product by supplier',
-      data: data,
-    })
-  } catch (error) {
-    logger.error('Error in product.findAllBySupplierId', { error })
-    const statusCode = error.statusCode || 500
-    return res.status(statusCode).send({
-      message: error.message || 'Internal Server Error',
-    })
+    if (existingBarcode) {
+      throw ErrorAppHandler('Barcode already exists for another product')
+    }
+
+    updateData.barcode = barcode
+
+    // test
+    const [barcodeUpdateCount] = await product_barcodes.update(
+      { barcode },
+      { where: { product_id }, transaction }
+    )
+
+    if (barcodeUpdateCount === 0) {
+      throw ErrorAppHandler('Barcode not found for the specified product')
+    }
   }
-}
+
+  if (Object.keys(updateData).length === 0) {
+    throw ErrorAppHandler('No valid fields to update')
+  }
+
+  const [updatedRowsCount] = await products.update(updateData, {
+    where: { id: product_id },
+    transaction,
+  })
+
+  if (updatedRowsCount === 0) {
+    throw ErrorAppHandler('Product not found', 404)
+  }
+
+  return SuccessHandler(res, 'Successfully! ')
+})
+
+// ========================== HANDLE GET PRODUCT BY SUPPLIER ==============================
+exports.ProductBySupplierId = AsyncHandler(async (req, res) => {
+  const data = await products.findAll({
+    where: {
+      supplier_id: req.params.id,
+      deleted_at: null,
+    },
+    attributes: [
+      'id',
+      'name',
+      'product_variant_name',
+      'barcode',
+      'uom',
+      'stock',
+      'currency',
+      'price',
+    ],
+    include: [
+      {
+        model: product_barcodes,
+        attributes: ['barcode'],
+        require: false,
+      },
+    ],
+  })
+
+  return SuccessHandler(res, 'Successfully! get all product by supplier', data)
+})
