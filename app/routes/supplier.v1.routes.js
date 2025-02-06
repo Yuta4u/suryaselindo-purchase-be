@@ -4,15 +4,15 @@ module.exports = (app) => {
   var router = require('express').Router()
 
   // GET
-  router.get('/', supplier.Supplier)
-  router.get('/with-product', supplier.SupplierWithProduct)
-  router.get('/name', supplier.SupplierName)
-  router.get('/:id', supplier.OneSupplier)
+  router.get('/', supplier.findAll)
+  router.get('/with-product', supplier.findAllWithProduct)
+  router.get('/name', supplier.findAllName)
+  router.get('/:id', supplier.findOne)
 
   // POST
-  router.post('/', supplier.CreateSupplier)
+  router.post('/', supplier.create)
 
   // PUT
-  router.put('/update', supplier.UpdateSupplier)
+  router.put('/update', supplier.update)
   app.use('/api/v1/supplier', router)
 }

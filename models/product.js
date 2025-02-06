@@ -10,12 +10,11 @@ module.exports = (sequelize, DataTypes) => {
       products.hasMany(models.product_barcodes, {
         foreignKey: 'product_id',
       })
-      // products.belongsToMany(models.suppliers, {
-      //   through: models.product_purchases,
-      //   foreignKey: 'product_id',
-      //   otherKey: 'supplier_id',
-      //   as: 'suppliers',
-      // })
+
+      // NEW
+      products.hasOne(models.product_purchases, {
+        foreignKey: 'id',
+      })
     }
   }
   products.init(

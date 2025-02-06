@@ -16,7 +16,6 @@ const today = require('../utils/today')
 const { sendWhatsappNotification } = require('../utils/twilio')
 const { logger } = require('../utils/logger')
 const { approveNotification } = require('../utils/approve-po-twilio')
-const { errorHandling } = require('../utils/error-handling')
 const { AsyncHandler, TransactionHandler } = require('../utils/async-handler')
 const { ErrorAppHandler } = require('../utils/error-handler')
 const { ValidatePoItem } = require('../helpers/list-po-item.helpers')
@@ -24,30 +23,34 @@ const { ValidateCreatePo } = require('../helpers/list-po.helpers')
 const SuccessHandler = require('../utils/success-handler')
 
 // GENERATE NEW NO PO
-const functionGenerateNoPo = AsyncHandler(async () => {
-  const year = new Date().getFullYear()
-  const latest_list_po = await list_pos.findAll({
-    limit: 1,
-    order: [[literal("CAST(SPLIT_PART(no_po, '/', 1) AS INTEGER)"), 'DESC']], // Sort by the numeric part
-    where: {
-      no_po: { [Op.ne]: null },
-      [Op.and]: [
-        where(
-          literal("SPLIT_PART(no_po, '/', 5)"), // Extract year part
-          year.toString()
-        ),
-      ],
-    },
-    attributes: ['no_po'],
-  })
+const functionGenerateNoPo = async () => {
+  try {
+    const year = new Date().getFullYear()
+    const latest_list_po = await list_pos.findAll({
+      limit: 1,
+      order: [[literal("CAST(SPLIT_PART(no_po, '/', 1) AS INTEGER)"), 'DESC']], // Sort by the numeric part
+      where: {
+        no_po: { [Op.ne]: null },
+        [Op.and]: [
+          where(
+            literal("SPLIT_PART(no_po, '/', 5)"), // Extract year part
+            year.toString()
+          ),
+        ],
+      },
+      attributes: ['no_po'],
+    })
 
-  const latest_no_po =
-    Number(latest_list_po[0]?.dataValues?.no_po?.split('/')[0]) || 0
-  const po_number = formatPoNumber(latest_no_po + 1)
-  const month = romawi[new Date().getMonth()]
-  const no_po = `${po_number}/PO/STI/${month}/${year}`
-  return no_po
-})
+    const latest_no_po =
+      Number(latest_list_po[0]?.dataValues?.no_po?.split('/')[0]) || 0
+    const po_number = formatPoNumber(latest_no_po + 1)
+    const month = romawi[new Date().getMonth()]
+    const no_po = `${po_number}/PO/SS/${month}/${year}`
+    return no_po
+  } catch (error) {
+    throw ErrorAppHandler('Failed to generate no po', 402)
+  }
+}
 
 // ========================== HANDLE CREATE PO ==============================
 exports.CreatePO = TransactionHandler(async (req, res, next, transaction) => {
@@ -95,6 +98,7 @@ exports.CreatePO = TransactionHandler(async (req, res, next, transaction) => {
     const validatedPoItems = await Promise.all(
       data.map((item) => ValidatePoItem(item, newPO.id))
     )
+
     await list_po_items.bulkCreate(validatedPoItems, { transaction })
   }
 
@@ -338,6 +342,10 @@ exports.GetAllApprovedPO = AsyncHandler(async (req, res) => {
 exports.sendPo = AsyncHandler(async (req, res) => {
   const { name, no_po, msg, cc, to, subject, bcc, id } = req.body
 
+  return res.send({
+    message: 'lol',
+  })
+
   const htmlTemplate = `
   <!DOCTYPE html>
   <html lang="en">
@@ -456,8 +464,4 @@ exports.sendPo = AsyncHandler(async (req, res) => {
   }
 
   return SuccessHandler(res, 'Successfully! PO has been sent')
-
-  res.status(200).json({
-    message: 'PO sent successfully',
-  })
 })

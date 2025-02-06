@@ -30,11 +30,6 @@ exports.getToken = async (req, res, next) => {
       password,
     }
 
-    // tommy@suryaselindo.com
-    // asdf1234
-
-    console.log(tokenData, 'ini token data')
-
     const response = await fetch(
       `${process.env.BASE_URL}${API_CONFIG.ENDPOINTS.TOKEN}`,
       {

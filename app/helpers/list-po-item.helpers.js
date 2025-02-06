@@ -10,7 +10,7 @@ const ValidatePoItem = (item, poId) => {
     quantity: item.quantity,
     price: item.price,
     total_price: item.total_price || item.quantity * item.price,
-    product_id: item.id,
+    product_purchase_id: item.id,
     barcode: item.barcode,
   }
 }

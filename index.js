@@ -50,8 +50,7 @@ app.get('/', (req, res) => {
   res.json({ message: "Surya Selindo API Purchase, let's go!" })
 })
 
-// // Route to handle single image upload
-
+// v1
 require('./app/routes/supplier.v1.routes')(app)
 require('./app/routes/product.v1.routes')(app)
 require('./app/routes/product-barcode.v1.routes')(app)
@@ -70,6 +69,20 @@ require('./app/routes/product-brand.v1.routes')(app)
 require('./app/routes/product-variant.v1.routes')(app)
 require('./app/routes/product-grade.v1.routes')(app)
 require('./app/routes/product-uom.v1.routes')(app)
+
+// v2
+require('./app/routes/v2/supplier.v2.routes')(app)
+require('./app/routes/v2/product-purchase.v2.routes')(app)
+require('./app/routes/v2/product-barcode.v2.routes')(app)
+require('./app/routes/v2/list-po.v2.routes')(app)
+
+// additional product v2
+require('./app/routes/v2/product-uom.v2.routes')(app)
+require('./app/routes/v2/product-grade.v2.routes')(app)
+require('./app/routes/v2/product-group.v2.routes')(app)
+require('./app/routes/v2/product-type.v2.routes')(app)
+require('./app/routes/v2/product-brand.v2.routes')(app)
+require('./app/routes/v2/product-variant.v2.routes')(app)
 
 // Error handling middleware
 app.use(errorHandler)

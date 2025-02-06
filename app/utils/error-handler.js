@@ -1,3 +1,5 @@
+// kepake
+
 const { logger } = require('./logger')
 
 const ErrorAppHandler = (message, statusCode) => {

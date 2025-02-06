@@ -1,7 +1,6 @@
 const { list_pos, list_po_items, products, suppliers } = require('../../models')
 const { Op, col, literal, fn } = require('sequelize')
 const { HexaColor } = require('../utils/hexa-color')
-const { errorHandling } = require('../utils/error-handling')
 const { AsyncHandler } = require('../utils/async-handler')
 const { ErrorAppHandler } = require('../utils/error-handler')
 const { ValidateReport } = require('../helpers/report.helpers')

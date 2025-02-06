@@ -4,11 +4,9 @@ const { Model } = require('sequelize')
 module.exports = (sequelize, DataTypes) => {
   class list_po_items extends Model {
     static associate(models) {
-      list_po_items.belongsTo(models.products, {
-        foreignKey: 'product_id',
-      })
       list_po_items.belongsTo(models.product_purchases, {
         foreignKey: 'product_purchase_id',
+        // as: 'product',
       })
       list_po_items.belongsTo(models.list_pos, {
         foreignKey: 'list_po_id',

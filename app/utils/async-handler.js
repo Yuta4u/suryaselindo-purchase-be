@@ -1,8 +1,11 @@
+// KEPAKE
+
 const db = require('../../models')
 
 /**
  * Middleware untuk menangani async error tanpa transaksi.
  */
+
 const AsyncHandler = (fn) => async (req, res, next) => {
   try {
     await fn(req, res, next)

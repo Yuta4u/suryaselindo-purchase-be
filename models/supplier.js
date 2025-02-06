@@ -9,12 +9,11 @@ module.exports = (sequelize, DataTypes) => {
           as: 'Products',
         },
       })
-      // suppliers.belongsToMany(models.products, {
-      //   through: models.product_purchases,
-      //   foreignKey: 'supplier_id',
-      //   otherKey: 'product_id',
-      //   as: 'products',
-      // })
+
+      // NEW
+      suppliers.hasMany(models.product_purchases, {
+        foreignKey: 'supplier_id',
+      })
     }
   }
   suppliers.init(

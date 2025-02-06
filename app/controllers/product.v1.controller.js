@@ -15,7 +15,6 @@ const db = require('../../models')
 const { normalizePrice } = require('../utils/normalize-price')
 const { updatePriceNotification } = require('../utils/update-price-twilio')
 const { NumericPrice } = require('../utils/numeric-price')
-const { errorHandling } = require('../utils/error-handling')
 const { TransactionHandler, AsyncHandler } = require('../utils/async-handler')
 const { ErrorAppHandler } = require('../utils/error-handler')
 const { ValidateProduct } = require('../helpers/product.helpers')
@@ -46,7 +45,7 @@ exports.CreateProduct = TransactionHandler(
     // Centralize findOrCreateEntry logic
     const findOrCreateEntry = async (model, value) => {
       if (!value) {
-        errorHandling(`Missing value for ${model.name}`)
+        throw ErrorAppHandler(`Missing value for ${model.name}`, 400)
       }
 
       if (value.includes('|')) {
@@ -120,23 +119,6 @@ exports.CreateProduct = TransactionHandler(
         newProductId
       )
     }
-
-    // // Image upload with more robust validation
-    // if (req.file) {
-    //   const image = req.file
-    //   const MAX_IMAGE_SIZE = 5 * 1024 * 1024 // 5MB
-    //   const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
-
-    //   if (!ALLOWED_TYPES.includes(image.mimetype)) {
-    //     errorHandling(400, 'Invalid image type. Allowed: JPEG, PNG, WebP')
-    //   }
-
-    //   if (image.size > MAX_IMAGE_SIZE) {
-    //     errorHandling(400, 'Image exceeds max size of 5MB')
-    //   }
-
-    //   uploadedImageUrl = await storeImage(image)
-    // }
 
     const newProductData = {
       name: product_grade,

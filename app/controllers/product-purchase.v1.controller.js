@@ -9,10 +9,21 @@ exports.ProductPurchase = AsyncHandler(async (req, res) => {
       {
         model: products,
         as: 'product',
+        attributes: {
+          exclude: [
+            'price',
+            'currency',
+            'created_at',
+            'updated_at',
+            'supplier',
+            'supplier_id',
+          ],
+        },
       },
       {
         model: suppliers,
         as: 'supplier',
+        attributes: ['id', 'name'],
       },
     ],
   })
